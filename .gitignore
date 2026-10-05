@@ -22,3 +22,7 @@ pnpm-debug.log*
 # system
 .DS_Store
 *.pem
+.vercel
+
+.vercel
+.env*

@@ -4,9 +4,18 @@ import {
   JobApplication,
   JobApplicationFormData,
 } from "@/types/job";
+import { AuthResponse, AuthUser, LoginCredentials } from "@/types/auth";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
+function getAuthHeaders(): HeadersInit {
+  const token = typeof window !== "undefined" ? localStorage.getItem("careertrack_auth_token") : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 export interface FetchApplicationsParams {
   search?: string;
@@ -20,6 +29,39 @@ export interface FetchApplicationsParams {
 }
 
 export const api = {
+  // Authentication
+  async login(credentials: LoginCredentials): Promise<AuthResponse["data"]> {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentials),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || "Login failed. Please verify your email and password.");
+    }
+
+    return data.data;
+  },
+
+  async getMe(): Promise<AuthUser> {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to authenticate session");
+    }
+
+    return data.data.user;
+  },
+
+  // Applications
   async getApplications(
     params: FetchApplicationsParams = {}
   ): Promise<ApplicationsResponse> {
@@ -37,6 +79,7 @@ export const api = {
     if (params.limit) query.append("limit", String(params.limit));
 
     const res = await fetch(`${API_BASE_URL}/applications?${query.toString()}`, {
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -50,6 +93,7 @@ export const api = {
 
   async getApplicationById(id: string): Promise<JobApplication> {
     const res = await fetch(`${API_BASE_URL}/applications/${id}`, {
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -67,9 +111,7 @@ export const api = {
   ): Promise<JobApplication> {
     const res = await fetch(`${API_BASE_URL}/applications`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(formData),
     });
 
@@ -88,9 +130,7 @@ export const api = {
   ): Promise<JobApplication> {
     const res = await fetch(`${API_BASE_URL}/applications/${id}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(formData),
     });
 
@@ -106,6 +146,7 @@ export const api = {
   async deleteApplication(id: string): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/applications/${id}`, {
       method: "DELETE",
+      headers: getAuthHeaders(),
     });
 
     if (!res.ok) {
@@ -116,6 +157,7 @@ export const api = {
 
   async getStats(): Promise<ApplicationStats> {
     const res = await fetch(`${API_BASE_URL}/applications/stats`, {
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 

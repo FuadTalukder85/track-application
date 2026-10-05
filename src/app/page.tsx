@@ -16,6 +16,8 @@ import { JobApplicationCards } from "@/components/JobApplicationCards";
 import { JobApplicationModal } from "@/components/JobApplicationModal";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { LoginPage } from "@/components/LoginPage";
+import { useAuth } from "@/context/AuthContext";
 import {
   Briefcase,
   Plus,
@@ -23,9 +25,12 @@ import {
   AlertCircle,
   CheckCircle,
   Inbox,
+  Loader2,
 } from "lucide-react";
 
 export default function DashboardPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
   // State
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [stats, setStats] = useState<ApplicationStats | null>(null);
@@ -61,6 +66,7 @@ export default function DashboardPage() {
   };
 
   const loadData = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setLoading(true);
       setError(null);
@@ -84,11 +90,28 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, jobType, workMode, sortBy, sortOrder]);
+  }, [isAuthenticated, search, status, jobType, workMode, sortBy, sortOrder]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated, loadData]);
+
+  // If checking auth state, show smooth loader
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <p className="text-sm font-medium">Verifying session...</p>
+      </div>
+    );
+  }
+
+  // If not logged in, render the login page
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   // Form Submit Handler (Create or Edit)
   const handleSubmitApplication = async (formData: JobApplicationFormData) => {
