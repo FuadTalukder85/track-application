@@ -12,6 +12,7 @@
 # env files
 .env*.local
 .env
+.env*
 
 # debug
 npm-debug.log*
@@ -23,6 +24,3 @@ pnpm-debug.log*
 .DS_Store
 *.pem
 .vercel
-
-.vercel
-.env*
