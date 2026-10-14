@@ -20,13 +20,20 @@ import {
   CheckCircle2,
   Link as LinkIcon,
   Tag,
+  Sparkles,
+  ClipboardPaste,
+  Check,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { parseJobDescription } from "@/lib/jobParser";
 
 interface JobApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (formData: JobApplicationFormData) => Promise<void>;
   initialData?: JobApplication | null;
+  prefillData?: Partial<JobApplicationFormData> | null;
   isSubmitting: boolean;
 }
 
@@ -54,10 +61,14 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   onClose,
   onSubmit,
   initialData,
+  prefillData,
   isSubmitting,
 }) => {
   const [formData, setFormData] = useState<JobApplicationFormData>(defaultFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [rawPasteText, setRawPasteText] = useState("");
+  const [isAiBoxExpanded, setIsAiBoxExpanded] = useState(true);
+  const [autoFillSuccess, setAutoFillSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -81,14 +92,76 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
         applicationStatus: initialData.applicationStatus || "Applied",
         notes: initialData.notes || "",
       });
+      setIsAiBoxExpanded(false);
+    } else if (prefillData) {
+      setFormData({
+        ...defaultFormData,
+        ...prefillData,
+        applicationDate: prefillData.applicationDate || new Date().toISOString().split("T")[0],
+      });
+      setIsAiBoxExpanded(true);
+      if (prefillData.companyName || prefillData.jobTitle) {
+        setAutoFillSuccess(`Auto-filled: ${[prefillData.companyName, prefillData.jobTitle].filter(Boolean).join(" - ")}`);
+      }
     } else {
       setFormData({
         ...defaultFormData,
         applicationDate: new Date().toISOString().split("T")[0],
       });
+      setIsAiBoxExpanded(true);
     }
     setErrors({});
-  }, [initialData, isOpen]);
+  }, [initialData, prefillData, isOpen]);
+
+  const handleAutoFill = () => {
+    if (!rawPasteText.trim()) return;
+    const parsed = parseJobDescription(rawPasteText);
+    setFormData((prev) => ({
+      ...prev,
+      companyName: parsed.companyName || prev.companyName,
+      jobTitle: parsed.jobTitle || prev.jobTitle,
+      jobLocation: parsed.jobLocation || prev.jobLocation,
+      jobType: (parsed.jobType as JobType) || prev.jobType,
+      workMode: (parsed.workMode as WorkMode) || prev.workMode,
+      jobPostingUrl: parsed.jobPostingUrl || prev.jobPostingUrl,
+      salaryRange: parsed.salaryRange || prev.salaryRange,
+      expectedSalary: parsed.expectedSalary ?? prev.expectedSalary,
+      salaryCurrency: parsed.salaryCurrency || prev.salaryCurrency,
+      jobDescription: parsed.jobDescription || prev.jobDescription,
+      jobRequirements: parsed.jobRequirements || prev.jobRequirements,
+    }));
+
+    const filledList = [
+      parsed.companyName && "Company",
+      parsed.jobTitle && "Title",
+      parsed.jobLocation && "Location",
+      parsed.salaryRange && "Salary",
+      parsed.jobRequirements && "Requirements",
+    ].filter(Boolean);
+
+    setAutoFillSuccess(
+      filledList.length > 0
+        ? `Successfully auto-filled: ${filledList.join(", ")}!`
+        : "Text analyzed and form updated!"
+    );
+    setTimeout(() => setAutoFillSuccess(null), 6000);
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setRawPasteText(text);
+      }
+    } catch {
+      // Clipboard access denied
+    }
+  };
+
+  const handleSampleAutoFill = () => {
+    const sample = `Company: Stripe\nRole: Senior Frontend Engineer\nLocation: San Francisco, CA (Remote)\nJob Type: Full-time\nWork Mode: Remote\nSalary: $150,000 - $180,000 USD\nURL: https://stripe.com/jobs/senior-frontend\n\nAbout the job:\nBuilding world-class developer dashboard experiences using React and Next.js.\n\nRequirements:\n- 5+ years of experience with React & TypeScript\n- Strong experience in modern CSS and Web performance`;
+    setRawPasteText(sample);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -158,6 +231,114 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* AI Quick Auto-fill from Job Details */}
+          {!isEdit && (
+            <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/40 via-purple-950/20 to-slate-900/60 p-4 shadow-lg shadow-indigo-950/20 transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30">
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                      <span>Smart Auto-Fill from Job Details</span>
+                      <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-[10px] font-semibold tracking-wider uppercase">
+                        AI Assist
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Paste a job description or email to auto-fill Company, Title, Location, Salary & Requirements
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAiBoxExpanded(!isAiBoxExpanded)}
+                  className="px-2.5 py-1 text-xs text-indigo-300 hover:text-white rounded-lg hover:bg-indigo-900/40 border border-indigo-500/20 flex items-center gap-1 transition cursor-pointer"
+                >
+                  {isAiBoxExpanded ? (
+                    <>
+                      <span>Collapse</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Paste & Auto-Fill</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {isAiBoxExpanded && (
+                <div className="mt-3.5 pt-3 border-t border-indigo-500/20 space-y-2.5 animate-fadeIn">
+                  <div className="relative">
+                    <textarea
+                      rows={3}
+                      value={rawPasteText}
+                      onChange={(e) => setRawPasteText(e.target.value)}
+                      placeholder="Paste full job posting text here (from LinkedIn, Indeed, Glassdoor, or email)..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-indigo-500/30 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 resize-none font-sans"
+                    />
+                  </div>
+
+                  {autoFillSuccess && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs animate-fadeIn">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{autoFillSuccess}</span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAutoFill}
+                        disabled={!rawPasteText.trim()}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 disabled:opacity-40 text-white font-medium text-xs shadow-md shadow-indigo-600/30 transition hover:scale-[1.02] cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Auto-Fill Form</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handlePasteClipboard}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs transition border border-slate-700 cursor-pointer"
+                      >
+                        <ClipboardPaste className="w-3 h-3 text-cyan-400" />
+                        <span>Paste Clipboard</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSampleAutoFill}
+                        className="text-[11px] text-indigo-300 hover:text-indigo-200 underline underline-offset-2 cursor-pointer"
+                      >
+                        Try Sample Job
+                      </button>
+                      {rawPasteText && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRawPasteText("");
+                            setAutoFillSuccess(null);
+                          }}
+                          className="text-[11px] text-slate-400 hover:text-slate-200 cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Section 1: Company & Role */}
           <div className="space-y-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">

@@ -17,6 +17,7 @@ import { JobApplicationModal } from "@/components/JobApplicationModal";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { LoginPage } from "@/components/LoginPage";
+import { JobChatbot } from "@/components/JobChatbot";
 import { useAuth } from "@/context/AuthContext";
 import {
   Briefcase,
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [editingApplication, setEditingApplication] = useState<JobApplication | null>(null);
+  const [prefillData, setPrefillData] = useState<Partial<JobApplicationFormData> | null>(null);
   const [viewingApplication, setViewingApplication] = useState<JobApplication | null>(null);
   const [deletingApplication, setDeletingApplication] = useState<JobApplication | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -191,6 +193,7 @@ export default function DashboardPage() {
       <Navbar
         onOpenAddModal={() => {
           setEditingApplication(null);
+          setPrefillData(null);
           setIsAddModalOpen(true);
         }}
         totalApplications={stats?.total || applications.length}
@@ -355,9 +358,11 @@ export default function DashboardPage() {
         onClose={() => {
           setIsAddModalOpen(false);
           setEditingApplication(null);
+          setPrefillData(null);
         }}
         onSubmit={handleSubmitApplication}
         initialData={editingApplication}
+        prefillData={prefillData}
         isSubmitting={isSubmitting}
       />
 
@@ -383,6 +388,15 @@ export default function DashboardPage() {
         onClose={() => setDeletingApplication(null)}
         onConfirm={handleConfirmDelete}
         isDeleting={isDeleting}
+      />
+
+      {/* AI Assistant Chatbot */}
+      <JobChatbot
+        onApplyJob={(parsed) => {
+          setEditingApplication(null);
+          setPrefillData(parsed);
+          setIsAddModalOpen(true);
+        }}
       />
     </div>
   );
